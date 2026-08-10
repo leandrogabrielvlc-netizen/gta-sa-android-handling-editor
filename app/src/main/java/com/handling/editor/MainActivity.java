@@ -2440,9 +2440,6 @@ private void ToastMessage(
 }
 
 		}
-import java.util.ArrayList;
-import java.util.HashMap;
-
 
 // =============================================================
 // LISTVIEW PERSONALIZADO
