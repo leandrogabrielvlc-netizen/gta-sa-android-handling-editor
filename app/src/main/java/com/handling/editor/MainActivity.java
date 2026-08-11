@@ -525,22 +525,28 @@ public class MainActivity extends Activity {
 
     } catch (Exception e) {
 
-        shizukuServiceSolicitado = false;
-        shizukuService = null;
-        shizukuConectado = false;
+    shizukuServiceSolicitado = false;
+    shizukuService = null;
+    shizukuConectado = false;
 
-        status.setText(
-            "● Erro ao iniciar serviço do Shizuku"
-        );
+    String erro = e.getClass().getSimpleName();
 
-        status.setTextColor(
-            VERMELHO
-        );
-
-        ToastMessage(
-            "Erro ao iniciar o serviço do Shizuku."
-        );
+    if (e.getMessage() != null) {
+        erro += ": " + e.getMessage();
     }
+
+    status.setText(
+        "● Erro Shizuku: " + erro
+    );
+
+    status.setTextColor(
+        VERMELHO
+    );
+
+    ToastMessage(
+        "Erro Shizuku: " + erro
+    );
+}
 }
     // =========================================================
     // RESULTADO DA PERMISSÃO DO SHIZUKU
