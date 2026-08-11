@@ -520,11 +520,31 @@ public class MainActivity extends Activity {
             /*
              * ESTA É A CHAMADA QUE ESTAVA FALTANDO.
              */
-            boolean conectado =
-                Shizuku.bindUserService(
-                    shizukuArgs,
-                    shizukuConnection
-                );
+            try {
+    Shizuku.bindUserService(
+        shizukuArgs,
+        shizukuConnection
+    );
+
+} catch (Exception e) {
+
+    shizukuService = null;
+    shizukuConectado = false;
+
+    if (status != null) {
+        status.setText(
+            "● Erro ao conectar ao Shizuku"
+        );
+
+        status.setTextColor(
+            VERMELHO
+        );
+    }
+
+    ToastMessage(
+        "Erro ao conectar ao serviço do Shizuku."
+    );
+}
 
 
             if (!conectado) {
