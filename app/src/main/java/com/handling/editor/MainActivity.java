@@ -8,7 +8,9 @@ import android.content.Intent;
 import android.content.Context;
 import android.content.pm.PackageManager;
 import android.net.Uri;
-
+import android.os.IBinder;
+import android.content.ComponentName;
+import android.content.ServiceConnection;
 import android.graphics.Color;
 import android.graphics.Typeface;
 
@@ -102,6 +104,84 @@ public class MainActivity extends Activity {
     private static final int EXPORTAR_ARQUIVO = 200;
 
     private static final int SHIZUKU_PERMISSION_CODE = 500;
+    // =============================================================
+// CONEXÃO COM O SERVIÇO DO SHIZUKU
+// =============================================================
+
+private IShizukuFileService shizukuService = null;
+
+private boolean shizukuConectado = false;
+
+
+private final Shizuku.UserServiceArgs shizukuArgs =
+    new Shizuku.UserServiceArgs(
+        new ComponentName(
+            this,
+            ShizukuFileService.class
+        )
+    )
+    .daemon(false)
+    .version(1)
+    .processNameSuffix("file");
+
+
+private final ServiceConnection shizukuConnection =
+    new ServiceConnection() {
+
+        @Override
+        public void onServiceConnected(
+            ComponentName name,
+            IBinder binder) {
+
+            shizukuService =
+                IShizukuFileService.Stub
+                    .asInterface(binder);
+
+            shizukuConectado =
+                shizukuService != null;
+
+
+            if (shizukuConectado) {
+
+                if (status != null) {
+
+                    status.setText(
+                        "● Shizuku conectado"
+                    );
+
+                    status.setTextColor(
+                        VERDE
+                    );
+                }
+
+                ToastMessage(
+                    "Shizuku conectado!"
+                );
+            }
+        }
+
+
+        @Override
+        public void onServiceDisconnected(
+            ComponentName name) {
+
+            shizukuService = null;
+
+            shizukuConectado = false;
+
+
+            if (status != null) {
+
+                status.setText(
+                    "● Shizuku desconectado"
+                );
+
+                status.setTextColor(
+                    VERMELHO
+                );
+            }
+        }
+    };
 
 
     // =========================================================
