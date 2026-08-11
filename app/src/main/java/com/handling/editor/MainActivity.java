@@ -547,7 +547,7 @@ public class MainActivity extends Activity {
 }
 
 
-            if (!conectado) {
+            if (!shizukuConectado) {
 
                 shizukuServiceSolicitado = false;
 
