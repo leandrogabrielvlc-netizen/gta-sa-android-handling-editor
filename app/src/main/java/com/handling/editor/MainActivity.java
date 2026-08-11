@@ -1464,292 +1464,153 @@ public class MainActivity extends Activity {
         return conteudo.toString();
     }
 
-
     // =========================================================
-    // ESCREVER ARQUIVO USANDO SHIZUKU
-    // =========================================================
+// SUBSTITUIR NOS DOIS ARQUIVOS
+// =========================================================
 
-    private boolean escreverArquivoShizuku(
-        String caminho,
-        String conteudo) {
+private void substituirNosDoisArquivos() {
 
-        Process processo = null;
+    if (
+        shizukuService == null ||
+        !shizukuConectado
+    ) {
 
-        OutputStream saida = null;
+        ToastMessage(
+            "Shizuku ainda não está conectado."
+        );
 
-
-        try {
-
-            if (!Shizuku.pingBinder()) {
-                return false;
-            }
-
-
-            if (
-                Shizuku.checkSelfPermission()
-                != PackageManager.PERMISSION_GRANTED
-            ) {
-                return false;
-            }
-
-
-            /*
-             * Converte o conteúdo para Base64.
-             *
-             * Isso evita problemas com:
-             * espaços
-             * aspas
-             * caracteres especiais
-             * quebras de linha
-             */
-
-            String base64 =
-                Base64.encodeToString(
-                    conteudo.getBytes("UTF-8"),
-                    Base64.NO_WRAP
-                );
-
-
-            /*
-             * Caminhos são fixos e controlados
-             * pelo próprio aplicativo.
-             */
-
-            String comando =
-                "base64 -d > \""
-                + caminho
-                + "\"";
-
-
-            processo =
-                Shizuku.newProcess(
-                    new String[] {
-                        "sh",
-                        "-c",
-                        comando
-                    },
-                    null,
-                    null
-                );
-
-
-            saida =
-                processo.getOutputStream();
-
-
-            saida.write(
-                base64.getBytes("US-ASCII")
-            );
-
-
-            saida.flush();
-
-            saida.close();
-
-            saida = null;
-
-
-            int codigo =
-                processo.waitFor();
-
-
-            return codigo == 0;
-
-
-        } catch (Exception e) {
-
-            return false;
-
-
-        } finally {
-
-            try {
-
-                if (saida != null) {
-                    saida.close();
-                }
-
-            } catch (Exception ignored) {
-            }
-
-
-            if (processo != null) {
-
-                try {
-                    processo.destroy();
-                } catch (Exception ignored) {
-                }
-            }
-        }
+        return;
     }
 
 
-    // =========================================================
-    // SUBSTITUIR NOS DOIS ARQUIVOS
-    // =========================================================
-
-    private void substituirNosDoisArquivos() {
-
-        if (!Shizuku.pingBinder()) {
-
-            ToastMessage(
-                "Shizuku não está em execução."
-            );
-
-            return;
-        }
+    final String conteudo =
+        gerarHandlingFinal();
 
 
-        if (
-            Shizuku.checkSelfPermission()
-            != PackageManager.PERMISSION_GRANTED
-        ) {
+    new Thread(
+        new Runnable() {
 
-            ToastMessage(
-                "O aplicativo não possui permissão do Shizuku."
-            );
+            @Override
+            public void run() {
 
-            Shizuku.requestPermission(
-                SHIZUKU_PERMISSION_CODE
-            );
-
-            return;
-        }
+                boolean dataOK = false;
+                boolean sampOK = false;
 
 
-        final String conteudo =
-            gerarHandlingFinal();
+                try {
 
-
-        status.setText(
-            "● Substituindo handling..."
-        );
-
-        status.setTextColor(
-            TEXTO_SECUNDARIO
-        );
-
-
-        new Thread(
-            new Runnable() {
-
-                @Override
-                public void run() {
-
-                    boolean dataOK = false;
-                    boolean sampOK = false;
-
-
-                    /*
-                     * DATA
-                     */
-
+                    // Serviço privilegiado do Shizuku
                     dataOK =
-                        escreverArquivoShizuku(
+                        shizukuService.writeFile(
                             HANDLING_DATA_PATH,
                             conteudo
                         );
 
 
-                    /*
-                     * SAMP
-                     */
-
+                    // Serviço privilegiado do Shizuku
                     sampOK =
-                        escreverArquivoShizuku(
+                        shizukuService.writeFile(
                             HANDLING_SAMP_PATH,
                             conteudo
                         );
 
 
-                    final boolean resultadoData =
-                        dataOK;
+                } catch (Exception e) {
 
-                    final boolean resultadoSamp =
-                        sampOK;
-
-
-                    runOnUiThread(
-                        new Runnable() {
-
-                            @Override
-                            public void run() {
-
-                                if (
-                                    resultadoData &&
-                                    resultadoSamp
-                                ) {
-
-                                    status.setText(
-                                        "● Handling substituído na DATA e SAMP"
-                                    );
-
-                                    status.setTextColor(
-                                        VERDE
-                                    );
-
-                                    ToastMessage(
-                                        "Handling substituído nos dois diretórios!"
-                                    );
+                    dataOK = false;
+                    sampOK = false;
+                }
 
 
-                                } else if (
-                                    resultadoData
-                                ) {
+                final boolean resultadoData =
+                    dataOK;
 
-                                    status.setText(
-                                        "● DATA substituída, erro na SAMP"
-                                    );
-
-                                    status.setTextColor(
-                                        VERMELHO
-                                    );
-
-                                    ToastMessage(
-                                        "DATA substituída. Erro na SAMP."
-                                    );
+                final boolean resultadoSamp =
+                    sampOK;
 
 
-                                } else if (
-                                    resultadoSamp
-                                ) {
+                runOnUiThread(
+                    new Runnable() {
 
-                                    status.setText(
-                                        "● SAMP substituído, erro na DATA"
-                                    );
+                        @Override
+                        public void run() {
 
-                                    status.setTextColor(
-                                        VERMELHO
-                                    );
+                            if (
+                                resultadoData &&
+                                resultadoSamp
+                            ) {
 
-                                    ToastMessage(
-                                        "SAMP substituído. Erro na DATA."
-                                    );
+                                status.setText(
+                                    "● Handling substituído na DATA e SAMP"
+                                );
+
+                                status.setTextColor(
+                                    VERDE
+                                );
+
+                                ToastMessage(
+                                    "Handling substituído nos dois diretórios!"
+                                );
 
 
-                                } else {
+                            } else if (
+                                resultadoData
+                            ) {
 
-                                    status.setText(
-                                        "● Erro ao substituir handling"
-                                    );
+                                status.setText(
+                                    "● DATA substituída, mas erro na SAMP"
+                                );
 
-                                    status.setTextColor(
-                                        VERMELHO
-                                    );
+                                status.setTextColor(
+                                    VERMELHO
+                                );
 
-                                    ToastMessage(
-                                        "Não foi possível escrever os arquivos."
-                                    );
-                                }
+                                ToastMessage(
+                                    "DATA substituída. Erro na SAMP."
+                                );
+
+
+                            } else if (
+                                resultadoSamp
+                            ) {
+
+                                status.setText(
+                                    "● SAMP substituído, mas erro na DATA"
+                                );
+
+                                status.setTextColor(
+                                    VERMELHO
+                                );
+
+                                ToastMessage(
+                                    "SAMP substituído. Erro na DATA."
+                                );
+
+
+                            } else {
+
+                                status.setText(
+                                    "● Erro ao substituir handling"
+                                );
+
+                                status.setTextColor(
+                                    VERMELHO
+                                );
+
+                                ToastMessage(
+                                    "Não foi possível substituir os arquivos."
+                                );
                             }
                         }
-                    );
-                }
+                    }
+                );
             }
-        ).start();
-    }
+        }
+    ).start();
+}
 
 
+        
     // =========================================================
     // ESCREVER NORMALMENTE NO SAF
     // =========================================================
