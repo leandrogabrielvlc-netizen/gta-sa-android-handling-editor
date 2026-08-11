@@ -1,164 +1,143 @@
 package com.handling.editor;
 
-import android.content.Context;
+import android.app.Service;
+import android.content.Intent;
 import android.os.IBinder;
-import android.os.ParcelFileDescriptor;
 
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
-import java.io.BufferedReader;
-import java.io.InputStreamReader;
-import java.io.OutputStreamWriter;
-import java.io.BufferedWriter;
+public class ShizukuFileService extends Service {
 
-public class ShizukuFileService
-        extends IShizukuFileService.Stub {
+    private final IShizukuFileService.Stub binder =
+            new IShizukuFileService.Stub() {
 
-    private Context context;
+        @Override
+        public boolean writeFile(String path, String content) {
 
-    public ShizukuFileService() {
-    }
+            try {
 
-    public ShizukuFileService(Context context) {
-        this.context = context;
-    }
+                java.io.File arquivo =
+                        new java.io.File(path);
 
-    @Override
-    public boolean writeFile(
-            String path,
-            String content) {
+                java.io.File pasta =
+                        arquivo.getParentFile();
 
-        try {
+                if (pasta != null && !pasta.exists()) {
+                    pasta.mkdirs();
+                }
 
-            File arquivo =
-                    new File(path);
+                java.io.BufferedWriter escritor =
+                        new java.io.BufferedWriter(
+                                new java.io.OutputStreamWriter(
+                                        new java.io.FileOutputStream(arquivo),
+                                        "UTF-8"
+                                )
+                        );
 
-            File pasta =
-                    arquivo.getParentFile();
+                escritor.write(content);
+                escritor.flush();
+                escritor.close();
 
-            if (pasta != null &&
-                !pasta.exists()) {
+                return true;
 
-                pasta.mkdirs();
+            } catch (Exception e) {
+
+                return false;
             }
+        }
 
-            BufferedWriter escritor =
-                    new BufferedWriter(
-                            new OutputStreamWriter(
-                                    new FileOutputStream(arquivo),
-                                    "UTF-8"
-                            )
+        @Override
+        public boolean copyFile(
+                String source,
+                String destination) {
+
+            java.io.FileInputStream entrada = null;
+            java.io.FileOutputStream saida = null;
+
+            try {
+
+                java.io.File origem =
+                        new java.io.File(source);
+
+                java.io.File destino =
+                        new java.io.File(destination);
+
+                java.io.File pasta =
+                        destino.getParentFile();
+
+                if (pasta != null && !pasta.exists()) {
+                    pasta.mkdirs();
+                }
+
+                entrada =
+                        new java.io.FileInputStream(origem);
+
+                saida =
+                        new java.io.FileOutputStream(destino);
+
+                byte[] buffer =
+                        new byte[8192];
+
+                int quantidade;
+
+                while (
+                        (quantidade = entrada.read(buffer)) != -1
+                ) {
+
+                    saida.write(
+                            buffer,
+                            0,
+                            quantidade
                     );
+                }
 
-            escritor.write(content);
+                saida.flush();
 
-            escritor.flush();
-            escritor.close();
+                return true;
 
-            return true;
+            } catch (Exception e) {
 
-        } catch (Exception e) {
+                return false;
 
-            return false;
+            } finally {
+
+                try {
+                    if (entrada != null) {
+                        entrada.close();
+                    }
+                } catch (Exception ignored) {
+                }
+
+                try {
+                    if (saida != null) {
+                        saida.close();
+                    }
+                } catch (Exception ignored) {
+                }
+            }
         }
-    }
 
-    @Override
-    public boolean copyFile(
-            String source,
-            String destination) {
-
-        FileInputStream entrada = null;
-        FileOutputStream saida = null;
-
-        try {
-
-            File origem =
-                    new File(source);
-
-            File destino =
-                    new File(destination);
-
-            File pasta =
-                    destino.getParentFile();
-
-            if (pasta != null &&
-                !pasta.exists()) {
-
-                pasta.mkdirs();
-            }
-
-            entrada =
-                    new FileInputStream(origem);
-
-            saida =
-                    new FileOutputStream(destino);
-
-            byte[] buffer =
-                    new byte[8192];
-
-            int quantidade;
-
-            while (
-                    (quantidade =
-                            entrada.read(buffer)) != -1
-            ) {
-
-                saida.write(
-                        buffer,
-                        0,
-                        quantidade
-                );
-            }
-
-            saida.flush();
-
-            return true;
-
-        } catch (Exception e) {
-
-            return false;
-
-        } finally {
+        @Override
+        public boolean fileExists(String path) {
 
             try {
 
-                if (entrada != null) {
-                    entrada.close();
-                }
+                return new java.io.File(path).exists();
 
-            } catch (Exception ignored) {
-            }
+            } catch (Exception e) {
 
-            try {
-
-                if (saida != null) {
-                    saida.close();
-                }
-
-            } catch (Exception ignored) {
+                return false;
             }
         }
-    }
+
+        @Override
+        public void destroy() {
+
+            stopSelf();
+        }
+    };
 
     @Override
-    public boolean fileExists(
-            String path) {
+    public IBinder onBind(Intent intent) {
 
-        try {
-
-            return new File(path).exists();
-
-        } catch (Exception e) {
-
-            return false;
-        }
+        return binder;
     }
-
-    @Override
-    public void destroy() {
-
-        System.exit(0);
-    }
-        }
+}
