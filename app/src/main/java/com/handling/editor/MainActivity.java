@@ -31,8 +31,6 @@ import android.text.Editable;
 import android.text.TextWatcher;
 import android.text.InputType;
 
-import android.util.Base64;
-
 import rikka.shizuku.Shizuku;
 
 import java.io.BufferedReader;
@@ -104,84 +102,119 @@ public class MainActivity extends Activity {
     private static final int EXPORTAR_ARQUIVO = 200;
 
     private static final int SHIZUKU_PERMISSION_CODE = 500;
-    // =============================================================
-// CONEXÃO COM O SERVIÇO DO SHIZUKU
-// =============================================================
-
-private IShizukuFileService shizukuService = null;
-
-private boolean shizukuConectado = false;
 
 
-private final Shizuku.UserServiceArgs shizukuArgs =
-    new Shizuku.UserServiceArgs(
-        new ComponentName(
-            this,
-            ShizukuFileService.class
+    // =========================================================
+    // CONEXÃO COM O SERVIÇO DO SHIZUKU
+    // =========================================================
+
+    private IShizukuFileService shizukuService = null;
+
+    private boolean shizukuConectado = false;
+
+    private boolean shizukuServiceSolicitado = false;
+
+
+    /*
+     * IMPORTANTE:
+     *
+     * Este objeto representa o serviço privilegiado
+     * que será executado pelo Shizuku.
+     */
+    private final Shizuku.UserServiceArgs shizukuArgs =
+        new Shizuku.UserServiceArgs(
+            new ComponentName(
+                this,
+                ShizukuFileService.class
+            )
         )
-    )
-    .daemon(false)
-    .version(1)
-    .processNameSuffix("file");
+        .daemon(false)
+        .version(1)
+        .processNameSuffix("file");
 
 
-private final ServiceConnection shizukuConnection =
-    new ServiceConnection() {
+    // =========================================================
+    // CONEXÃO COM O USER SERVICE
+    // =========================================================
 
-        @Override
-        public void onServiceConnected(
-            ComponentName name,
-            IBinder binder) {
+    private final ServiceConnection shizukuConnection =
+        new ServiceConnection() {
 
-            shizukuService =
-                IShizukuFileService.Stub
-                    .asInterface(binder);
+            @Override
+            public void onServiceConnected(
+                ComponentName name,
+                IBinder binder) {
 
-            shizukuConectado =
-                shizukuService != null;
+                shizukuService =
+                    IShizukuFileService.Stub
+                        .asInterface(binder);
+
+                shizukuConectado =
+                    shizukuService != null;
+
+                shizukuServiceSolicitado = false;
 
 
-            if (shizukuConectado) {
+                if (shizukuConectado) {
+
+                    if (status != null) {
+
+                        status.setText(
+                            "● Shizuku conectado"
+                        );
+
+                        status.setTextColor(
+                            VERDE
+                        );
+                    }
+
+                    ToastMessage(
+                        "Shizuku conectado!"
+                    );
+
+                } else {
+
+                    if (status != null) {
+
+                        status.setText(
+                            "● Serviço do Shizuku não conectou"
+                        );
+
+                        status.setTextColor(
+                            VERMELHO
+                        );
+                    }
+
+                    ToastMessage(
+                        "Não foi possível conectar ao serviço do Shizuku."
+                    );
+                }
+            }
+
+
+            @Override
+            public void onServiceDisconnected(
+                ComponentName name) {
+
+                shizukuService = null;
+
+                shizukuConectado = false;
+
+                shizukuServiceSolicitado = false;
+
 
                 if (status != null) {
 
                     status.setText(
-                        "● Shizuku conectado"
+                        "● Shizuku desconectado"
                     );
 
                     status.setTextColor(
-                        VERDE
+                        VERMELHO
                     );
                 }
-
-                ToastMessage(
-                    "Shizuku conectado!"
-                );
             }
-        }
-
-
-        @Override
-        public void onServiceDisconnected(
-            ComponentName name) {
-
-            shizukuService = null;
-
-            shizukuConectado = false;
-
-
-            if (status != null) {
-
-                status.setText(
-                    "● Shizuku desconectado"
-                );
-
-                status.setTextColor(
-                    VERMELHO
-                );
-            }
-        }
-    };
+        };
 
 
     // =========================================================
@@ -307,7 +340,15 @@ private final ServiceConnection shizukuConnection =
 
         try {
 
+            /*
+             * Primeiro verificamos se o Shizuku está
+             * realmente rodando.
+             */
             if (!Shizuku.pingBinder()) {
+
+                shizukuService = null;
+
+                shizukuConectado = false;
 
                 status.setText(
                     "● Shizuku não está em execução"
@@ -325,10 +366,17 @@ private final ServiceConnection shizukuConnection =
             }
 
 
+            /*
+             * Depois verificamos a permissão do aplicativo.
+             */
             if (
                 Shizuku.checkSelfPermission()
                 != PackageManager.PERMISSION_GRANTED
             ) {
+
+                shizukuService = null;
+
+                shizukuConectado = false;
 
                 status.setText(
                     "● Aguardando permissão do Shizuku"
@@ -346,20 +394,21 @@ private final ServiceConnection shizukuConnection =
             }
 
 
-            status.setText(
-                "● Shizuku conectado"
-            );
-
-            status.setTextColor(
-                VERDE
-            );
-
-            ToastMessage(
-                "Shizuku conectado!"
-            );
-
+            /*
+             * AQUI ESTÁ A CORREÇÃO PRINCIPAL.
+             *
+             * Ter permissão não significa que o UserService
+             * já esteja conectado.
+             *
+             * Precisamos fazer o bind.
+             */
+            conectarServicoShizuku();
 
         } catch (Exception e) {
+
+            shizukuService = null;
+
+            shizukuConectado = false;
 
             status.setText(
                 "● Erro ao verificar Shizuku"
@@ -367,6 +416,156 @@ private final ServiceConnection shizukuConnection =
 
             status.setTextColor(
                 VERMELHO
+            );
+        }
+    }
+
+
+    // =========================================================
+    // CONECTAR SERVIÇO PRIVILEGIADO
+    // =========================================================
+
+    private void conectarServicoShizuku() {
+
+        try {
+
+            if (!Shizuku.pingBinder()) {
+
+                shizukuService = null;
+
+                shizukuConectado = false;
+
+                status.setText(
+                    "● Shizuku não está em execução"
+                );
+
+                status.setTextColor(
+                    VERMELHO
+                );
+
+                return;
+            }
+
+
+            if (
+                Shizuku.checkSelfPermission()
+                != PackageManager.PERMISSION_GRANTED
+            ) {
+
+                shizukuService = null;
+
+                shizukuConectado = false;
+
+                status.setText(
+                    "● Permissão do Shizuku necessária"
+                );
+
+                status.setTextColor(
+                    VERMELHO
+                );
+
+                return;
+            }
+
+
+            /*
+             * Se já estiver conectado, não fazemos
+             * outro bind.
+             */
+            if (
+                shizukuService != null &&
+                shizukuConectado
+            ) {
+
+                status.setText(
+                    "● Shizuku conectado"
+                );
+
+                status.setTextColor(
+                    VERDE
+                );
+
+                return;
+            }
+
+
+            /*
+             * Evita pedir o mesmo serviço várias vezes.
+             */
+            if (shizukuServiceSolicitado) {
+
+                status.setText(
+                    "● Conectando ao Shizuku..."
+                );
+
+                status.setTextColor(
+                    TEXTO_SECUNDARIO
+                );
+
+                return;
+            }
+
+
+            shizukuServiceSolicitado = true;
+
+            status.setText(
+                "● Conectando ao Shizuku..."
+            );
+
+            status.setTextColor(
+                TEXTO_SECUNDARIO
+            );
+
+
+            /*
+             * ESTA É A CHAMADA QUE ESTAVA FALTANDO.
+             */
+            boolean conectado =
+                Shizuku.bindUserService(
+                    shizukuArgs,
+                    shizukuConnection
+                );
+
+
+            if (!conectado) {
+
+                shizukuServiceSolicitado = false;
+
+                shizukuService = null;
+
+                shizukuConectado = false;
+
+                status.setText(
+                    "● Falha ao conectar ao serviço do Shizuku"
+                );
+
+                status.setTextColor(
+                    VERMELHO
+                );
+
+                ToastMessage(
+                    "Falha ao conectar ao serviço do Shizuku."
+                );
+            }
+
+        } catch (Exception e) {
+
+            shizukuServiceSolicitado = false;
+
+            shizukuService = null;
+
+            shizukuConectado = false;
+
+            status.setText(
+                "● Erro ao conectar ao Shizuku"
+            );
+
+            status.setTextColor(
+                VERMELHO
+            );
+
+            ToastMessage(
+                "Erro ao conectar ao serviço do Shizuku."
             );
         }
     }
@@ -399,18 +598,43 @@ private final ServiceConnection shizukuConnection =
                 ) {
 
                     status.setText(
-                        "● Shizuku conectado"
+                        "● Permissão concedida — conectando..."
                     );
 
                     status.setTextColor(
                         VERDE
                     );
 
+
                     ToastMessage(
-                        "Permissão do Shizuku concedida!"
+                        "Permissão concedida!"
+                    );
+
+
+                    /*
+                     * IMPORTANTE:
+                     *
+                     * Depois da permissão precisamos
+                     * realmente conectar o UserService.
+                     */
+                    new android.os.Handler(
+                        getMainLooper()
+                    ).post(
+                        new Runnable() {
+
+                            @Override
+                            public void run() {
+
+                                conectarServicoShizuku();
+                            }
+                        }
                     );
 
                 } else {
+
+                    shizukuService = null;
+
+                    shizukuConectado = false;
 
                     status.setText(
                         "● Permissão do Shizuku recusada"
@@ -428,6 +652,10 @@ private final ServiceConnection shizukuConnection =
         };
 
 
+    // =========================================================
+    // START
+    // =========================================================
+
     @Override
     protected void onStart() {
 
@@ -441,8 +669,30 @@ private final ServiceConnection shizukuConnection =
 
         } catch (Exception ignored) {
         }
+
+
+        /*
+         * Quando a Activity volta para a tela,
+         * verificamos novamente o estado do Shizuku.
+         */
+        new android.os.Handler(
+            getMainLooper()
+        ).post(
+            new Runnable() {
+
+                @Override
+                public void run() {
+
+                    iniciarShizuku();
+                }
+            }
+        );
     }
 
+
+    // =========================================================
+    // STOP
+    // =========================================================
 
     @Override
     protected void onStop() {
@@ -456,7 +706,41 @@ private final ServiceConnection shizukuConnection =
         } catch (Exception ignored) {
         }
 
+
         super.onStop();
+    }
+
+
+    // =========================================================
+    // DESTROY
+    // =========================================================
+
+    @Override
+    protected void onDestroy() {
+
+        try {
+
+            if (shizukuServiceSolicitado) {
+
+                Shizuku.unbindUserService(
+                    shizukuArgs,
+                    shizukuConnection,
+                    true
+                );
+            }
+
+        } catch (Exception ignored) {
+        }
+
+
+        shizukuService = null;
+
+        shizukuConectado = false;
+
+        shizukuServiceSolicitado = false;
+
+
+        super.onDestroy();
     }
 
 
@@ -1414,6 +1698,9 @@ private final ServiceConnection shizukuConnection =
         }
 
 
+        /*
+         * Primeiro verifica o Binder do Shizuku.
+         */
         if (!Shizuku.pingBinder()) {
 
             status.setText(
@@ -1432,6 +1719,9 @@ private final ServiceConnection shizukuConnection =
         }
 
 
+        /*
+         * Verifica a permissão.
+         */
         if (
             Shizuku.checkSelfPermission()
             != PackageManager.PERMISSION_GRANTED
@@ -1457,6 +1747,42 @@ private final ServiceConnection shizukuConnection =
         }
 
 
+        /*
+         * MUITO IMPORTANTE:
+         *
+         * Se tem permissão, mas o serviço ainda não
+         * está conectado, tentamos conectar antes
+         * de mostrar "Shizuku ainda não conectado".
+         */
+        if (
+            shizukuService == null ||
+            !shizukuConectado
+        ) {
+
+            status.setText(
+                "● Conectando ao serviço do Shizuku..."
+            );
+
+            status.setTextColor(
+                TEXTO_SECUNDARIO
+            );
+
+
+            conectarServicoShizuku();
+
+
+            ToastMessage(
+                "Conectando ao Shizuku, aguarde..."
+            );
+
+            return;
+        }
+
+
+        /*
+         * Só mostra a confirmação quando o serviço
+         * realmente estiver conectado.
+         */
         new AlertDialog.Builder(this)
             .setTitle(
                 "Substituir handling"
@@ -1544,153 +1870,166 @@ private final ServiceConnection shizukuConnection =
         return conteudo.toString();
     }
 
+
     // =========================================================
-// SUBSTITUIR NOS DOIS ARQUIVOS
-// =========================================================
+    // SUBSTITUIR NOS DOIS ARQUIVOS
+    // =========================================================
 
-private void substituirNosDoisArquivos() {
+    private void substituirNosDoisArquivos() {
 
-    if (
-        shizukuService == null ||
-        !shizukuConectado
-    ) {
+        /*
+         * Segurança extra:
+         * nunca tenta escrever se o serviço caiu.
+         */
+        if (
+            shizukuService == null ||
+            !shizukuConectado
+        ) {
 
-        ToastMessage(
-            "Shizuku ainda não está conectado."
-        );
+            ToastMessage(
+                "Shizuku ainda não está conectado."
+            );
 
-        return;
+            /*
+             * Tenta reconectar.
+             */
+            conectarServicoShizuku();
+
+            return;
+        }
+
+
+        final String conteudo =
+            gerarHandlingFinal();
+
+
+        new Thread(
+            new Runnable() {
+
+                @Override
+                public void run() {
+
+                    boolean dataOK = false;
+                    boolean sampOK = false;
+
+
+                    try {
+
+                        /*
+                         * Serviço privilegiado do Shizuku.
+                         */
+                        dataOK =
+                            shizukuService.writeFile(
+                                HANDLING_DATA_PATH,
+                                conteudo
+                            );
+
+
+                        /*
+                         * Serviço privilegiado do Shizuku.
+                         */
+                        sampOK =
+                            shizukuService.writeFile(
+                                HANDLING_SAMP_PATH,
+                                conteudo
+                            );
+
+
+                    } catch (Exception e) {
+
+                        dataOK = false;
+                        sampOK = false;
+                    }
+
+
+                    final boolean resultadoData =
+                        dataOK;
+
+                    final boolean resultadoSamp =
+                        sampOK;
+
+
+                    runOnUiThread(
+                        new Runnable() {
+
+                            @Override
+                            public void run() {
+
+                                if (
+                                    resultadoData &&
+                                    resultadoSamp
+                                ) {
+
+                                    status.setText(
+                                        "● Handling substituído na DATA e SAMP"
+                                    );
+
+                                    status.setTextColor(
+                                        VERDE
+                                    );
+
+                                    ToastMessage(
+                                        "Handling substituído nos dois diretórios!"
+                                    );
+
+
+                                } else if (
+                                    resultadoData
+                                ) {
+
+                                    status.setText(
+                                        "● DATA substituída, mas erro na SAMP"
+                                    );
+
+                                    status.setTextColor(
+                                        VERMELHO
+                                    );
+
+                                    ToastMessage(
+                                        "DATA substituída. Erro na SAMP."
+                                    );
+
+
+                                } else if (
+                                    resultadoSamp
+                                ) {
+
+                                    status.setText(
+                                        "● SAMP substituído, mas erro na DATA"
+                                    );
+
+                                    status.setTextColor(
+                                        VERMELHO
+                                    );
+
+                                    ToastMessage(
+                                        "SAMP substituído. Erro na DATA."
+                                    );
+
+
+                                } else {
+
+                                    status.setText(
+                                        "● Erro ao substituir handling"
+                                    );
+
+                                    status.setTextColor(
+                                        VERMELHO
+                                    );
+
+                                    ToastMessage(
+                                        "Não foi possível substituir os arquivos."
+                                    );
+                                }
+                            }
+                        }
+                    );
+                }
+            }
+        ).start();
     }
 
 
-    final String conteudo =
-        gerarHandlingFinal();
-
-
-    new Thread(
-        new Runnable() {
-
-            @Override
-            public void run() {
-
-                boolean dataOK = false;
-                boolean sampOK = false;
-
-
-                try {
-
-                    // Serviço privilegiado do Shizuku
-                    dataOK =
-                        shizukuService.writeFile(
-                            HANDLING_DATA_PATH,
-                            conteudo
-                        );
-
-
-                    // Serviço privilegiado do Shizuku
-                    sampOK =
-                        shizukuService.writeFile(
-                            HANDLING_SAMP_PATH,
-                            conteudo
-                        );
-
-
-                } catch (Exception e) {
-
-                    dataOK = false;
-                    sampOK = false;
-                }
-
-
-                final boolean resultadoData =
-                    dataOK;
-
-                final boolean resultadoSamp =
-                    sampOK;
-
-
-                runOnUiThread(
-                    new Runnable() {
-
-                        @Override
-                        public void run() {
-
-                            if (
-                                resultadoData &&
-                                resultadoSamp
-                            ) {
-
-                                status.setText(
-                                    "● Handling substituído na DATA e SAMP"
-                                );
-
-                                status.setTextColor(
-                                    VERDE
-                                );
-
-                                ToastMessage(
-                                    "Handling substituído nos dois diretórios!"
-                                );
-
-
-                            } else if (
-                                resultadoData
-                            ) {
-
-                                status.setText(
-                                    "● DATA substituída, mas erro na SAMP"
-                                );
-
-                                status.setTextColor(
-                                    VERMELHO
-                                );
-
-                                ToastMessage(
-                                    "DATA substituída. Erro na SAMP."
-                                );
-
-
-                            } else if (
-                                resultadoSamp
-                            ) {
-
-                                status.setText(
-                                    "● SAMP substituído, mas erro na DATA"
-                                );
-
-                                status.setTextColor(
-                                    VERMELHO
-                                );
-
-                                ToastMessage(
-                                    "SAMP substituído. Erro na DATA."
-                                );
-
-
-                            } else {
-
-                                status.setText(
-                                    "● Erro ao substituir handling"
-                                );
-
-                                status.setTextColor(
-                                    VERMELHO
-                                );
-
-                                ToastMessage(
-                                    "Não foi possível substituir os arquivos."
-                                );
-                            }
-                        }
-                    }
-                );
-            }
-        }
-    ).start();
-}
-
-
-        
     // =========================================================
     // ESCREVER NORMALMENTE NO SAF
     // =========================================================
