@@ -427,86 +427,65 @@ public class MainActivity extends Activity {
 
     private void conectarServicoShizuku() {
 
-        try {
+    try {
 
-            if (!Shizuku.pingBinder()) {
+        if (!Shizuku.pingBinder()) {
 
-                shizukuService = null;
+            shizukuService = null;
+            shizukuConectado = false;
+            shizukuServiceSolicitado = false;
 
-                shizukuConectado = false;
+            status.setText(
+                "● Shizuku não está em execução"
+            );
 
-                status.setText(
-                    "● Shizuku não está em execução"
-                );
+            status.setTextColor(
+                VERMELHO
+            );
 
-                status.setTextColor(
-                    VERMELHO
-                );
-
-                return;
-            }
-
-
-            if (
-                Shizuku.checkSelfPermission()
-                != PackageManager.PERMISSION_GRANTED
-            ) {
-
-                shizukuService = null;
-
-                shizukuConectado = false;
-
-                status.setText(
-                    "● Permissão do Shizuku necessária"
-                );
-
-                status.setTextColor(
-                    VERMELHO
-                );
-
-                return;
-            }
+            return;
+        }
 
 
-            /*
-             * Se já estiver conectado, não fazemos
-             * outro bind.
-             */
-            if (
-                shizukuService != null &&
-                shizukuConectado
-            ) {
+        if (
+            Shizuku.checkSelfPermission()
+            != PackageManager.PERMISSION_GRANTED
+        ) {
 
-                status.setText(
-                    "● Shizuku conectado"
-                );
+            shizukuService = null;
+            shizukuConectado = false;
+            shizukuServiceSolicitado = false;
 
-                status.setTextColor(
-                    VERDE
-                );
+            status.setText(
+                "● Permissão do Shizuku necessária"
+            );
 
-                return;
-            }
+            status.setTextColor(
+                VERMELHO
+            );
 
-
-            /*
-             * Evita pedir o mesmo serviço várias vezes.
-             */
-            if (shizukuServiceSolicitado) {
-
-                status.setText(
-                    "● Conectando ao Shizuku..."
-                );
-
-                status.setTextColor(
-                    TEXTO_SECUNDARIO
-                );
-
-                return;
-            }
+            return;
+        }
 
 
-            shizukuServiceSolicitado = true;
+        if (
+            shizukuService != null &&
+            shizukuConectado
+        ) {
+
+            status.setText(
+                "● Shizuku conectado"
+            );
+
+            status.setTextColor(
+                VERDE
+            );
+
+            return;
+        }
+
+
+        if (shizukuServiceSolicitado) {
 
             status.setText(
                 "● Conectando ao Shizuku..."
@@ -516,81 +495,53 @@ public class MainActivity extends Activity {
                 TEXTO_SECUNDARIO
             );
 
+            return;
+        }
 
-            /*
-             * ESTA É A CHAMADA QUE ESTAVA FALTANDO.
-             */
-            try {
-    Shizuku.bindUserService(
-        shizukuArgs,
-        shizukuConnection
-    );
 
-} catch (Exception e) {
+        shizukuServiceSolicitado = true;
 
-    shizukuService = null;
-    shizukuConectado = false;
+        shizukuService = null;
+        shizukuConectado = false;
 
-    if (status != null) {
+
         status.setText(
-            "● Erro ao conectar ao Shizuku"
+            "● Conectando ao Shizuku..."
+        );
+
+        status.setTextColor(
+            TEXTO_SECUNDARIO
+        );
+
+
+        // IMPORTANTE:
+        // bindUserService() NÃO retorna boolean.
+        // A conexão será confirmada em onServiceConnected().
+        Shizuku.bindUserService(
+            shizukuArgs,
+            shizukuConnection
+        );
+
+
+    } catch (Exception e) {
+
+        shizukuServiceSolicitado = false;
+        shizukuService = null;
+        shizukuConectado = false;
+
+        status.setText(
+            "● Erro ao iniciar serviço do Shizuku"
         );
 
         status.setTextColor(
             VERMELHO
         );
-    }
 
-    ToastMessage(
-        "Erro ao conectar ao serviço do Shizuku."
-    );
+        ToastMessage(
+            "Erro ao iniciar o serviço do Shizuku."
+        );
+    }
 }
-
-
-            if (!shizukuConectado) {
-
-                shizukuServiceSolicitado = false;
-
-                shizukuService = null;
-
-                shizukuConectado = false;
-
-                status.setText(
-                    "● Falha ao conectar ao serviço do Shizuku"
-                );
-
-                status.setTextColor(
-                    VERMELHO
-                );
-
-                ToastMessage(
-                    "Falha ao conectar ao serviço do Shizuku."
-                );
-            }
-
-        } catch (Exception e) {
-
-            shizukuServiceSolicitado = false;
-
-            shizukuService = null;
-
-            shizukuConectado = false;
-
-            status.setText(
-                "● Erro ao conectar ao Shizuku"
-            );
-
-            status.setTextColor(
-                VERMELHO
-            );
-
-            ToastMessage(
-                "Erro ao conectar ao serviço do Shizuku."
-            );
-        }
-    }
-
-
     // =========================================================
     // RESULTADO DA PERMISSÃO DO SHIZUKU
     // =========================================================
