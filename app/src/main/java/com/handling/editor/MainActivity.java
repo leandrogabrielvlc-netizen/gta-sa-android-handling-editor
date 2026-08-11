@@ -132,7 +132,6 @@ public class MainActivity extends Activity {
             )
         )
         .daemon(false)
-        .debuggable(BuildConfig.DEBUG)
         .version(1)
         .processNameSuffix("file");
 
