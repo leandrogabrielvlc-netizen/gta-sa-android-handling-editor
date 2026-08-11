@@ -115,24 +115,7 @@ public class MainActivity extends Activity {
     private boolean shizukuServiceSolicitado = false;
 
 
-    /*
-     * IMPORTANTE:
-     *
-     * Este objeto representa o serviço privilegiado
-     * que será executado pelo Shizuku.
-     */
-    private final Shizuku.UserServiceArgs shizukuArgs =
-        new Shizuku.UserServiceArgs(
-            new ComponentName(
-                this,
-                ShizukuFileService.class
-            )
-        )
-        .daemon(false)
-        .version(1)
-        .processNameSuffix("file");
-
-
+    private Shizuku.UserServiceArgs shizukuArgs;
     // =========================================================
     // CONEXÃO COM O USER SERVICE
     // =========================================================
@@ -320,17 +303,26 @@ public class MainActivity extends Activity {
     // INÍCIO
     // =========================================================
 
-    @Override
-    protected void onCreate(
-        Bundle savedInstanceState) {
+@Override
+protected void onCreate(Bundle savedInstanceState) {
 
-        super.onCreate(savedInstanceState);
+    super.onCreate(savedInstanceState);
 
-        criarInterface();
+    shizukuArgs =
+        new Shizuku.UserServiceArgs(
+            new ComponentName(
+                getApplicationContext(),
+                ShizukuFileService.class
+            )
+        )
+        .daemon(false)
+        .version(1)
+        .processNameSuffix("file");
 
-        iniciarShizuku();
-    }
+    criarInterface();
 
+    iniciarShizuku();
+}
 
     // =========================================================
     // SHIZUKU
