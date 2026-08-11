@@ -6,6 +6,10 @@ android {
     namespace 'com.handling.editor'
     compileSdk 36
 
+    buildFeatures {
+        aidl true
+    }
+
     defaultConfig {
         applicationId 'com.handling.editor'
         minSdk 24
