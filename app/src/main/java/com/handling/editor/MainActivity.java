@@ -31,7 +31,7 @@ import android.text.Editable;
 import android.text.TextWatcher;
 import android.text.InputType;
 
-import com.shizuku.api.Shizuku;
+import rikka.shizuku.Shizuku;
 
 import java.io.BufferedReader;
 import java.io.InputStream;
